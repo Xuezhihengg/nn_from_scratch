@@ -4,15 +4,12 @@ import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from comm import Logger, Plotter
 
 from dataset.wikitext2_dataset import WikiText2Dataset
 
-from model.rnn import SimpleRNN, DeepRNN, BidRNN
-from model.gru import SimpleGRU, DeepGRU, BidGRU
-from model.lstm import SimpleLSTM, DeepLSTM, BidLSTM
+from model.rnn_model import RNNModel
 
 
 # 超参数
@@ -32,7 +29,7 @@ valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
 vocab_size = len(train_dataset.vocab)
 
-model = BidLSTM(vocab_size)
+model = RNNModel(vocab_size, embedding_dim=50, hidden_size=100)
 logger.print_model_params(model)
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -50,13 +47,14 @@ for epoch in range(num_epochs):
     for i, (batch_X, batch_Y) in enumerate(train_loader):
         logger.info(f"    Batch {i}")
 
-        batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
+        batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)   # (batch_size, seq_length)
 
         optimizer.zero_grad()
-        outputs = model(batch_X)
-        logits = outputs[:, -1, :]
+        outputs = model(batch_X)    # (batch_size, seq_length, vocab_size)
+        logits = outputs[:, -1, :]  # (batch_size, vocab_size)
+        labels = batch_Y            # (batch_size,)     标签Y不是序列形式，不能计算全序列loss，只能对最后一步预测计算loss
 
-        loss = criterion(logits, batch_Y)
+        loss = criterion(logits, labels)
         loss.backward()
         optimizer.step()
 
@@ -74,8 +72,9 @@ for epoch in range(num_epochs):
             batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
             outputs = model(batch_X)
             logits = outputs[:, -1, :]
+            labels = batch_Y
 
-            loss = criterion(logits, batch_Y)
+            loss = criterion(logits, labels)
             total_loss_valid += loss.item()
 
     avg_loss_valid = total_loss_valid / len(valid_loader)

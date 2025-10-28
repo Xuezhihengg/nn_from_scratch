@@ -7,34 +7,21 @@ from datasets import load_dataset
 from comm import Logger
 
 class WikiText2Dataset(Dataset):
-    def __init__(self, split='train', seq_length=30, min_freq=2, logger = None):
-        """
-        完整封装WikiText2加载、预处理、构建词表及数字化，生成训练样本。
-
-        参数:
-            split (str): 'train', 'validation'或'test'
-            seq_length (int): 输入序列长度
-            min_freq (int): 词汇表最小词频，低于此频率词映射为 <unk>
-
-        使用示例:
-            dataset = WikiText2Dataset(split='train', seq_length=30)
-            dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
-        """
+    def __init__(self, split='train', seq_length=30, min_freq=2):
         super().__init__()
-
-        if logger is None:
-            self.logger = Logger("dataset.WikiText2Dataset")
         
-        # 1. 载入和预处理文本
+        self.logger = Logger("dataset.WikiText2Dataset")
+        
+        # 载入和预处理文本
         self.tokens = self._load_and_tokenize(split)
         
-        # 2. 构建词表
+        # 构建词表
         self.vocab, self.word2id, self.id2word = self._build_vocab(self.tokens, min_freq)
         
-        # 3. tokens转id
-        self.data_ids = self._tokens_to_ids(self.tokens)
+        # tokens转id
+        self.data_ids = self._tokens_to_ids(self.tokens, self.word2id)
 
-        # 4. 构造样本序列长度
+        # 构造样本序列长度
         self.seq_length = seq_length
         self.n_samples = len(self.data_ids) - self.seq_length
         assert self.n_samples > 0, "数据长度必须大于seq_length"
@@ -53,6 +40,7 @@ class WikiText2Dataset(Dataset):
     def _load_and_tokenize(self, split):
         """
         加载数据集并预处理分词
+        数据源: HuggingFace
         """
         hf_split = 'validation' if split == 'valid' else split
         dataset = load_dataset("wikitext", "wikitext-2-raw-v1", split=hf_split)
@@ -84,9 +72,9 @@ class WikiText2Dataset(Dataset):
         return vocab, word2id, id2word
 
 
-    def _tokens_to_ids(self, tokens):
-        unk_id = self.word2id.get('<unk>')
-        ids = [self.word2id.get(tok, unk_id) for tok in tokens]
+    def _tokens_to_ids(self, tokens, word2id):
+        unk_id = word2id.get('<unk>')
+        ids = [word2id.get(tok, unk_id) for tok in tokens]
         return ids
 
 
