@@ -10,7 +10,7 @@ class Logger:
         # 如果没有Handler才添加，防止Jupyter环境反复run多个handler叠加
         if not self.logger.handlers:
             handler = logging.StreamHandler(stream)
-            formatter = logging.Formatter('[%(asctime)s][%(levelname)s][%(name)s]: %(message)s',
+            formatter = logging.Formatter('[%(asctime)s]: %(message)s',
                               datefmt='%Y-%m-%d %H:%M:%S')
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)

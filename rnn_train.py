@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from comm import Logger, Plotter
+from tqdm import tqdm
 
 from dataset.wikitext2_dataset import WikiText2Dataset
 
@@ -29,7 +30,7 @@ valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
 vocab_size = len(train_dataset.vocab)
 
-model = RNNModel(vocab_size, embedding_dim=50, hidden_size=100)
+model = RNNModel(vocab_size, embedding_dim=50, hidden_size=100, num_layers=2, bidirectional=True)
 logger.print_model_params(model)
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -39,13 +40,13 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 criterion = nn.CrossEntropyLoss()
 
 for epoch in range(num_epochs):
-    logger.info(f"Epoch {epoch + 1}/{num_epochs}")
     # 训练阶段
     model.train()
     total_loss_train = 0
 
+    train_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{num_epochs} [Train]", ncols=100)
+
     for i, (batch_X, batch_Y) in enumerate(train_loader):
-        logger.info(f"    Batch {i}")
 
         batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)   # (batch_size, seq_length)
 
@@ -59,6 +60,7 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         total_loss_train += loss.item()
+        train_bar.set_postfix(loss=loss.item())
     
     avg_loss_train = total_loss_train / len(train_loader)
     perplexity_train = math.exp(avg_loss_train)
@@ -68,6 +70,7 @@ for epoch in range(num_epochs):
     total_loss_valid = 0
 
     with torch.no_grad():
+        valid_bar = tqdm(valid_loader, desc=f"Epoch {epoch + 1}/{num_epochs} [Valid]", ncols=100)
         for batch_X, batch_Y in valid_loader:
             batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
             outputs = model(batch_X)
@@ -76,13 +79,14 @@ for epoch in range(num_epochs):
 
             loss = criterion(logits, labels)
             total_loss_valid += loss.item()
+            valid_bar.set_postfix(loss=loss.item())
 
     avg_loss_valid = total_loss_valid / len(valid_loader)
     perplexity_valid = math.exp(avg_loss_valid)
 
     logger.info(
-        f"Train Loss: {avg_loss_train:.4f}, Perplexity: {perplexity_train:.2f} | "
-        f"Valid Loss: {avg_loss_valid:.4f}, Perplexity: {perplexity_valid:.2f}"
+        f"Epoch {epoch + 1}, Train Loss: {avg_loss_train:.4f}, Perplexity: {perplexity_train:.2f} | "
+        f"Epoch {epoch + 1}, Valid Loss: {avg_loss_valid:.4f}, Perplexity: {perplexity_valid:.2f}"
     )
 
     # 更新plotter数据

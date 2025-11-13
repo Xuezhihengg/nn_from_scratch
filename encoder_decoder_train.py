@@ -6,12 +6,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from comm import Logger, Plotter
+from tqdm import tqdm
 
 from dataset.tatoeba_dataset import TatoebaDataset
 
 from model.seq2seq_encoder_decoder import Seq2SeqEncoderDecoder
 
-
+torch.autograd.set_detect_anomaly(True)
 # 超参数
 seq_length = 10
 batch_size = 16
@@ -41,13 +42,14 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 criterion = nn.CrossEntropyLoss(ignore_index=pad_token_id)
 
 for epoch in range(num_epochs):
-    logger.info(f"Epoch {epoch + 1}/{num_epochs}")
     # 训练阶段
     model.train()
     total_loss_train = 0
 
+    train_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{num_epochs} [Train]", ncols=100)
+
     for i, (batch_X, batch_Y) in enumerate(train_loader):
-        logger.info(f"    Batch {i}")
+        # logger.info(f"    Batch {i}")
 
         batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)   # (batch_size, seq_length)
 
@@ -66,6 +68,8 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         total_loss_train += loss.item()
+        train_bar.set_postfix(loss=loss.item())
+
     
     avg_loss_train = total_loss_train / len(train_loader)
     perplexity_train = math.exp(avg_loss_train)
@@ -75,6 +79,7 @@ for epoch in range(num_epochs):
     total_loss_valid = 0
 
     with torch.no_grad():
+        valid_bar = tqdm(valid_loader, desc=f"Epoch {epoch + 1}/{num_epochs} [Valid]", ncols=100)
         for batch_X, batch_Y in valid_loader:
             batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
             dec_X = batch_Y[:, :-1]        # decoder输入
@@ -89,12 +94,14 @@ for epoch in range(num_epochs):
             loss = criterion(logits, labels)
             total_loss_valid += loss.item()
 
+            valid_bar.set_postfix(loss=loss.item())
+
     avg_loss_valid = total_loss_valid / len(valid_loader)
     perplexity_valid = math.exp(avg_loss_valid)
 
     logger.info(
-        f"Train Loss: {avg_loss_train:.4f}, Perplexity: {perplexity_train:.2f} | "
-        f"Valid Loss: {avg_loss_valid:.4f}, Perplexity: {perplexity_valid:.2f}"
+        f"Epoch {epoch + 1}, Train Loss: {avg_loss_train:.4f}, Perplexity: {perplexity_train:.2f} | "
+        f"Epoch {epoch + 1}, Valid Loss: {avg_loss_valid:.4f}, Perplexity: {perplexity_valid:.2f}"
     )
 
     # 更新plotter数据
